@@ -1,9 +1,11 @@
 import drawsvg as draw
 import random
 
+# random.seed(2025)
+
 pixels = []
-width = 5
-height = 3
+width = 50
+height = 30
 
 for i in range(0,width*height):
     pixels.append(random.randint(0,255))
@@ -152,6 +154,8 @@ def drawTConstruction(d):
 
 
 def drawVConstruction(d): 
+    filtration = [];
+
     for y in range(0,height):
         for x in range(0,width):
             # Vertice position
@@ -186,6 +190,13 @@ def drawVConstruction(d):
                     stroke_linejoin="round"
                 ))
 
+                filtration.append({
+                    "type": "cube", 
+                    "x": vx,
+                    "y": vy,
+                    "val": max(pixelVals)
+                })
+
             if(x<width-1):
                 l1 = draw.Line(
                     vx, vy,
@@ -209,6 +220,15 @@ def drawVConstruction(d):
                     paint_order="stroke fill markers",
                     stroke_linejoin="round"
                 ))
+
+                filtration.append({
+                    "type": "line", 
+                    "sx": vx,
+                    "sy": vy,
+                    "ex": vx + (pixelSize+gridPadding),
+                    "ey": vy,
+                    "val": max(pixelVals)
+                })
 
             if(y<height-1):
                 l2 = draw.Line(
@@ -234,6 +254,15 @@ def drawVConstruction(d):
                     stroke_linejoin="round"
                 ))
 
+                filtration.append({
+                    "type": "line", 
+                    "sx": vx,
+                    "sy": vy,
+                    "ex": vx,
+                    "ey": vy + (pixelSize+gridPadding),
+                    "val": max(pixelVals)
+                })
+
             c = draw.Circle(vx, vy, 6, fill=primaryColor, stroke=secondaryColor, stroke_width="2")
             d.append(c)
 
@@ -251,8 +280,78 @@ def drawVConstruction(d):
                 stroke_linejoin="round"
             ))
 
+            filtration.append({
+                "type": "vertex", 
+                "x": vx,
+                "y": vy,
+                "val": pixels[imgCoord]
+            })
+    return filtration
+
+# f: filtration of the complex
+def filterComplex(f):
+    tmpf = list(f)
+
+    filteredComplex = []
+
+    currentComplex = []
+    for i in range(0,256):
+        tmplen = len(currentComplex)
+        tbr = []
+        for e in tmpf:
+            if(e['val'] <= i): 
+                currentComplex.append(e)
+                tbr.append(e) # to be removed
+        for e in tbr: 
+            tmpf.remove(e)
+        if(len(currentComplex) > tmplen): 
+            filteredComplex.append({
+                "val": i,
+                "complex": list(currentComplex)
+            })
+        if(len(tmpf) == 0): break
+    
+    return filteredComplex
+
+def drawFilteredComplex(fc):
+    for c in fc: 
+        tmpd = draw.Drawing(svgWidth, svgHeight)
+        # drawImage(tmpd)
+
+        vertices = []
+        lines = []
+        cubes = []  
+        for e in c["complex"]:
+            if(e["type"] == "vertex"): 
+                vertices.append(e)
+            elif(e["type"] == "line"):
+                lines.append(e)
+            elif(e["type"] == "cube"):
+                cubes.append(e)
+
+        # Necessary for correct drawing order!
+        for e in cubes: 
+            tmpd.append(draw.Rectangle(
+                e["x"], e["y"],
+                pixelSize+gridPadding, pixelSize+gridPadding,
+                fill=primaryColor, fill_opacity=0.4
+            ))
+        for e in lines:
+            tmpd.append(draw.Line(
+                e["sx"], e["sy"],
+                e["ex"], e["ey"],
+                stroke=primaryColor,
+                stroke_width="6"
+            ))
+        for e in vertices: 
+            tmpd.append(draw.Circle(e["x"], e["y"], 6, fill=primaryColor, stroke=secondaryColor, stroke_width="2"))
+
+        tmpd.save_svg("fc/ccv"+str(c["val"])+".svg")
+
 drawImage(d)
-drawTConstruction(d)
+f = drawVConstruction(d)
+fc = filterComplex(f)
+drawFilteredComplex(fc)
 
 d.set_pixel_scale(2)
 d.save_svg('ccv.svg')
